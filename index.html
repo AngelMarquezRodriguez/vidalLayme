@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Integración numérica · Trapecio y Simpson</title>
+<style>
+:root{--bg:#f2f4f1;--panel:#fff;--ink:#1b2a36;--mute:#5b6b76;--line:#cfd8d4;--acc:#1f5f8b;--acc2:#c2410c;--ok:#1d7a4a;--bad:#b42318;--fill:rgba(31,95,139,.18);
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121a20;--panel:#1a252d;--ink:#e6edf1;--mute:#93a4af;--line:#2d3b45;--acc:#6db3e0;--acc2:#f59e5b;--ok:#5fd394;--bad:#ff8a80;--fill:rgba(109,179,224,.22)}}
+:root[data-theme="dark"]{--bg:#121a20;--panel:#1a252d;--ink:#e6edf1;--mute:#93a4af;--line:#2d3b45;--acc:#6db3e0;--acc2:#f59e5b;--ok:#5fd394;--bad:#ff8a80;--fill:rgba(109,179,224,.22)}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{padding:28px 20px 8px;max-width:1100px;margin:0 auto}
+h1{font:600 clamp(1.7rem,4vw,2.4rem)/1.15 Georgia,"Times New Roman",serif;margin:0 0 6px;letter-spacing:-.01em}
+header p{margin:0;color:var(--mute);max-width:62ch}
+main{max-width:1100px;margin:0 auto;padding:16px 20px 40px;display:grid;gap:18px;grid-template-columns:minmax(0,380px) minmax(0,1fr);align-items:start}
+@media (max-width:860px){main{grid-template-columns:minmax(0,1fr)}}
+section{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px}
+h2{font:600 1.1rem/1.2 Georgia,serif;margin:0 0 12px}
+h3{font:600 .95rem/1.2 system-ui,sans-serif;margin:18px 0 8px}
+label{display:block;font-size:.88rem;color:var(--mute);margin:12px 0 4px}
+input,textarea,select,button{font:inherit;color:var(--ink)}
+input[type=text],textarea,select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
+textarea{min-height:70px;resize:vertical;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.92rem}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tabs{display:flex;gap:6px;margin-bottom:6px}
+.tabs button{flex:1;padding:8px;border:1px solid var(--line);background:var(--bg);border-radius:6px;cursor:pointer}
+.tabs button[aria-selected=true]{background:var(--acc);color:#fff;border-color:var(--acc)}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.btn{padding:10px 16px;border-radius:6px;border:1px solid var(--acc);background:var(--acc);color:#fff;cursor:pointer;font-weight:600}
+.btn.sec{background:transparent;color:var(--acc)}
+.hint{font-size:.82rem;color:var(--mute);margin:4px 0 0}
+.err{border-left:4px solid var(--bad);background:rgba(180,35,24,.08);padding:10px 12px;border-radius:4px;margin:10px 0;color:var(--bad);font-size:.92rem}
+.ok{color:var(--ok);font-weight:600}.bad{color:var(--bad);font-weight:600}
+.scroll{overflow-x:auto;margin:6px 0}
+table{border-collapse:collapse;width:100%;font-size:.88rem;font-variant-numeric:tabular-nums}
+th,td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th{color:var(--mute);font-weight:600}th:first-child,td:first-child{text-align:left}
+.big{font:600 1.6rem/1.2 Georgia,serif;color:var(--acc);font-variant-numeric:tabular-nums}
+.meta{display:flex;gap:18px;flex-wrap:wrap;color:var(--mute);font-size:.9rem;margin-bottom:10px}
+.meta b{color:var(--ink)}
+.card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:10px 0}
+.card .formula{color:var(--mute);font-size:.85rem;margin:2px 0 6px}
+details{margin-top:6px}summary{cursor:pointer;color:var(--acc);font-size:.9rem}
+svg{width:100%;height:auto;display:block}
+.empty{color:var(--mute);padding:30px 0;text-align:center}
+</style>
+</head>
+<body>
+<header>
+<h1>Integración numérica</h1>
+<p>Calcula integrales definidas con trapecio compuesto, Simpson 1/3 y Simpson 3/8, a partir de datos tabulados o de una función f(x).</p>
+</header>
+<main>
+<section aria-labelledby="t-in">
+<h2 id="t-in">Datos de entrada</h2>
+<div class="tabs" role="tablist">
+<button role="tab" id="tab-d" aria-selected="true" type="button">Datos tabulados</button>
+<button role="tab" id="tab-f" aria-selected="false" type="button">Función f(x)</button>
+</div>
+
+<div id="pane-d">
+<label for="xs">Valores de x</label>
+<textarea id="xs" placeholder="0 1 2 3 4"></textarea>
+<label for="ys">Valores de y = f(x)</label>
+<textarea id="ys" placeholder="0 1 4 9 16"></textarea>
+<p class="hint">Sepárelos con espacios, saltos de línea, punto y coma o comas. La coma dentro de un número (0,5) se lee como decimal.</p>
+</div>
+
+<div id="pane-f" hidden>
+<label for="fx">f(x)</label>
+<input type="text" id="fx" placeholder="x^2" autocomplete="off" spellcheck="false">
+<p class="hint">Use * para multiplicar y ^ para potencias. Funciones: sin, cos, tan, sinh, cosh, exp, ln, log, sqrt, abs; constantes pi y e.</p>
+<div class="row">
+<div><label for="a">Límite a</label><input type="text" id="a" inputmode="decimal" placeholder="0"></div>
+<div><label for="b">Límite b</label><input type="text" id="b" inputmode="decimal" placeholder="2"></div>
+</div>
+<label for="n">Subintervalos n</label>
+<input type="text" id="n" inputmode="numeric" placeholder="8">
+<label style="display:flex;gap:8px;align-items:center;color:var(--ink)"><input type="checkbox" id="dbl"> Comparar también con 2n</label>
+</div>
+
+<h3>Método</h3>
+<select id="met" aria-label="Método">
+<option value="all">Todos (comparar)</option>
+<option value="trap">Trapecio compuesto</option>
+<option value="s13">Simpson 1/3</option>
+<option value="s38">Simpson 3/8</option>
+<option value="comb">Combinado: Simpson 1/3 + 3/8 (n impar)</option>
+</select>
+
+<h3>Unidades y referencia</h3>
+<div class="row">
+<div><label for="ux">Unidad de x</label><input type="text" id="ux" placeholder="s"></div>
+<div><label for="uy">Unidad de y</label><input type="text" id="uy" placeholder="m/s"></div>
+</div>
+<div class="row">
+<div><label for="fac">Multiplicar resultado por</label><input type="text" id="fac" inputmode="decimal" placeholder="1"></div>
+<div><label for="uf">Unidad final</label><input type="text" id="uf" placeholder="opcional"></div>
+</div>
+<label for="ref">Valor de referencia (opcional)</label>
+<input type="text" id="ref" inputmode="decimal" placeholder="Para calcular el error">
+<p class="hint">Sin valor de referencia no se puede calcular el error verdadero. Se compara con el resultado ya convertido.</p>
+
+<div class="actions">
+<button class="btn" id="go" type="button">Calcular</button>
+<button class="btn sec" id="test" type="button">Prueba x² en [0, 2]</button>
+<button class="btn sec" id="clr" type="button">Limpiar</button>
+</div>
+<div id="msg" role="alert"></div>
+</section>
+
+<section aria-labelledby="t-out" aria-live="polite">
+<h2 id="t-out">Resultados</h2>
+<div id="out"><p class="empty">Ingrese los datos y presione Calcular.</p></div>
+</section>
+</main>
+
+<script>
+(function(){
+"use strict";
+var $=function(i){return document.getElementById(i)};
+var mode="d";
+var NAMES={trap:"Trapecio compuesto",s13:"Simpson 1/3",s38:"Simpson 3/8",comb:"Simpson 1/3 + 3/8"};
+var FORM={trap:"T = h[(f₀+fₙ)/2 + Σ fᵢ]",s13:"S = (h/3)[f₀+fₙ+4Σ fᵢ (impar)+2Σ fᵢ (par)]",s38:"S = (3h/8)[f₀+fₙ+3Σ fᵢ (no múltiplo de 3)+2Σ fᵢ (múltiplo de 3)]",comb:"Simpson 1/3 en los primeros n−3 subintervalos y 3/8 en los últimos 3"};
+
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function fmt(v){if(!isFinite(v))return "—";var a=Math.abs(v);return (a>=1e9||(a>0&&a<1e-4))?v.toExponential(6):v.toFixed(6)}
+function num(s,label){
+  var t=String(s).trim().replace(",",".");
+  if(t===""||!/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(t))throw new Error(label+": «"+String(s).trim()+"» no es un número válido.");
+  return parseFloat(t);
+}
+function list(s,label){
+  var tk=s.trim().split(/[\s;]+/).filter(Boolean);
+  if(tk.length===1&&tk[0].indexOf(",")>-1)tk=tk[0].split(",").filter(Boolean);
+  tk=tk.map(function(x){return x.replace(/,+$/,"")}).filter(Boolean);
+  if(!tk.length)throw new Error("Escriba los valores de "+label+".");
+  return tk.map(function(x,i){return num(x,label+" (posición "+(i+1)+")")});
+}
+function compile(src){
+  var s=src.trim().toLowerCase();
+  if(!s)throw new Error("Escriba la función f(x).");
+  var fn=["sin","cos","tan","asin","acos","atan","sinh","cosh","tanh","exp","sqrt","abs"];
+  s=s.replace(/\^/g,"**").replace(/[a-z_]+/g,function(m){
+    if(m==="x")return "x";
+    if(m==="pi")return "M.PI";
+    if(m==="e")return "M.E";
+    if(m==="ln")return "M.log";
+    if(m==="log")return "M.log10";
+    if(fn.indexOf(m)>-1)return "M."+m;
+    throw new Error("Función o símbolo desconocido: «"+m+"».");
+  });
+  if(!/^[0-9a-zA-Z_.+\-*\/(),\s]*$/.test(s))throw new Error("La función contiene caracteres no permitidos.");
+  var f;
+  try{f=new Function("x","M","return ("+s+");")}catch(e){throw new Error("No se pudo interpretar la función. Revise paréntesis y operadores (use * para multiplicar).")}
+  return function(x){return f(x,Math)};
+}
+
+/* Pesos enteros y multiplicador global para cada método */
+function weights(m,n){
+  var c=[],i,mult,lab;
+  if(m==="trap"){
+    if(n<1)throw new Error("Se necesita al menos 1 subintervalo.");
+    for(i=0;i<=n;i++)c.push(i===0||i===n?1:2);mult=.5;lab="h/2";
+  }else if(m==="s13"){
+    if(n<2||n%2)throw new Error("Simpson 1/3 requiere n par (n = "+n+").");
+    for(i=0;i<=n;i++)c.push(i===0||i===n?1:(i%2?4:2));mult=1/3;lab="h/3";
+  }else if(m==="s38"){
+    if(n<3||n%3)throw new Error("Simpson 3/8 requiere n múltiplo de 3 (n = "+n+").");
+    for(i=0;i<=n;i++)c.push(i===0||i===n?1:(i%3?3:2));mult=3/8;lab="3h/8";
+  }else{
+    if(n<3||n%2===0)throw new Error("El método combinado requiere n impar y n ≥ 3 (n = "+n+").");
+    var k=n-3;for(i=0;i<=n;i++)c.push(0);
+    for(i=0;i<=k;i++)c[i]+=8*(i===0||i===k?1:(i%2?4:2));
+    [1,3,3,1].forEach(function(w,j){c[k+j]+=9*w});
+    mult=1/24;lab="h/24";
+  }
+  return{c:c,mult:mult,lab:lab};
+}
+function integrate(m,xs,ys,h){
+  var w=weights(m,ys.length-1),s=0;
+  for(var i=0;i<ys.length;i++)s+=w.c[i]*ys[i];
+  return{I:h*w.mult*s,w:w};
+}
+
+function getProblem(){
+  var ux=$("ux").value.trim(),uy=$("uy").value.trim(),xs,ys,h,curve=null,n,f;
+  if(mode==="d"){
+    xs=list($("xs").value,"x");ys=list($("ys").value,"y");
+    if(xs.length!==ys.length)throw new Error("Las listas tienen distinto tamaño: "+xs.length+" valores de x y "+ys.length+" de y.");
+    if(xs.length<2)throw new Error("Se necesitan al menos 2 puntos.");
+    for(var i=1;i<xs.length;i++)if(!(xs[i]>xs[i-1]))throw new Error("x debe ser estrictamente creciente (revise la posición "+(i+1)+").");
+    h=(xs[xs.length-1]-xs[0])/(xs.length-1);
+    for(i=1;i<xs.length;i++)if(Math.abs((xs[i]-xs[i-1])-h)>1e-6*Math.max(1,Math.abs(h)))throw new Error("El espaciamiento no es uniforme: entre las posiciones "+i+" y "+(i+1)+" hay "+(xs[i]-xs[i-1])+" y se esperaba h = "+h+".");
+    n=xs.length-1;
+  }else{
+    f=compile($("fx").value);
+    var a=num($("a").value,"Límite a"),b=num($("b").value,"Límite b"),nn=num($("n").value,"n");
+    if(!(a<b))throw new Error("Debe cumplirse a < b.");
+    if(nn%1!==0||nn<1)throw new Error("n debe ser un entero positivo.");
+    if(nn>100000)throw new Error("n es demasiado grande (máximo 100 000).");
+    n=nn;
+    curve={f:f,a:a,b:b};
+    var g=grid(f,a,b,n);xs=g.xs;ys=g.ys;h=(b-a)/n;
+  }
+  var fac=$("fac").value.trim()===""?1:num($("fac").value,"Factor");
+  var rs=$("ref").value.trim();
+  var ref=rs===""?null:num(rs,"Valor de referencia");
+  var base=(uy&&ux)?uy+"·"+ux:(uy||ux||"");
+  var uf=$("uf").value.trim()||base;
+  return{xs:xs,ys:ys,h:h,n:n,curve:curve,fac:fac,ref:ref,unit:uf,ux:ux,uy:uy,f:f};
+}
+function grid(f,a,b,n){
+  var xs=[],ys=[],h=(b-a)/n;
+  for(var i=0;i<=n;i++){var x=i===n?b:a+i*h,y=f(x);
+    if(typeof y!=="number"||!isFinite(y))throw new Error("f(x) no es finita en x = "+x+".");
+    xs.push(x);ys.push(y)}
+  return{xs:xs,ys:ys};
+}
+
+function chart(P){
+  var W=640,H=280,L=52,R=14,T=12,B=30,xs=P.xs,ys=P.ys;
+  var pts=xs.map(function(x,i){return[x,ys[i]]}),cv=null;
+  if(P.curve){cv=[];for(var i=0;i<=200;i++){var x=P.curve.a+(P.curve.b-P.curve.a)*i/200,y=P.curve.f(x);if(isFinite(y))cv.push([x,y])}}
+  var all=pts.concat(cv||[]);
+  var x0=xs[0],x1=xs[xs.length-1];
+  var y0=Math.min(0,Math.min.apply(null,all.map(function(p){return p[1]}))),y1=Math.max(0,Math.max.apply(null,all.map(function(p){return p[1]})));
+  if(y1===y0)y1=y0+1;var pad=(y1-y0)*.08;if(y0<0)y0-=pad;y1+=pad;
+  var sx=function(x){return L+(x-x0)/(x1-x0)*(W-L-R)},sy=function(y){return T+(y1-y)/(y1-y0)*(H-T-B)};
+  var s='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Gráfico de los datos y el área bajo la curva">';
+  for(var k=0;k<=4;k++){
+    var yv=y0+(y1-y0)*k/4,xv=x0+(x1-x0)*k/4;
+    s+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+sy(yv)+'" y2="'+sy(yv)+'" stroke="var(--line)" stroke-width="1"/>';
+    s+='<text x="'+(L-6)+'" y="'+(sy(yv)+4)+'" text-anchor="end" font-size="11" fill="var(--mute)">'+(+yv.toPrecision(3))+'</text>';
+    s+='<text x="'+sx(xv)+'" y="'+(H-10)+'" text-anchor="middle" font-size="11" fill="var(--mute)">'+(+xv.toPrecision(3))+'</text>';
+  }
+  var poly=pts.map(function(p){return sx(p[0])+","+sy(p[1])}).join(" ");
+  s+='<polygon points="'+sx(x0)+","+sy(0)+" "+poly+" "+sx(x1)+","+sy(0)+'" fill="var(--fill)"/>';
+  s+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+sy(0)+'" y2="'+sy(0)+'" stroke="var(--ink)" stroke-width="1"/>';
+  if(cv)s+='<polyline points="'+cv.map(function(p){return sx(p[0])+","+sy(p[1])}).join(" ")+'" fill="none" stroke="var(--acc2)" stroke-width="2"/>';
+  else s+='<polyline points="'+poly+'" fill="none" stroke="var(--acc)" stroke-width="2"/>';
+  if(pts.length<=60)pts.forEach(function(p){s+='<circle cx="'+sx(p[0])+'" cy="'+sy(p[1])+'" r="3.5" fill="var(--acc)"/>'});
+  var lab=(P.ux?"x ("+P.ux+")":"x")+(P.uy?"   ·   y ("+P.uy+")":"");
+  s+='<text x="'+L+'" y="'+(T+8)+'" font-size="11" fill="var(--mute)" dx="4">'+esc(lab)+'</text></svg>';
+  return s;
+}
+
+function errCells(P,I){
+  if(P.ref===null)return["—","—"];
+  var ea=Math.abs(P.ref-I);
+  return[fmt(ea),P.ref===0?"—":fmt(100*ea/Math.abs(P.ref))];
+}
+function methodCard(m,P,xs,ys,h,showW){
+  var r=integrate(m,xs,ys,h),I=r.I*P.fac,e=errCells(P,I);
+  var h1='<div class="card"><strong>'+NAMES[m]+'</strong><div class="formula">'+FORM[m]+'</div>';
+  h1+='<div class="big">'+fmt(I)+' <span style="font-size:1rem;color:var(--mute)">'+esc(P.unit)+'</span></div>';
+  if(P.ref!==null)h1+='<div class="hint">Error absoluto: '+e[0]+' · Error porcentual: '+e[1]+(e[1]==="—"?"":" %")+'</div>';
+  if(showW){
+    h1+='<details><summary>Tabla de pesos de integración</summary><div class="scroll"><table><thead><tr><th>i</th><th>xᵢ</th><th>fᵢ</th><th>Coef.</th><th>Coef.·fᵢ</th></tr></thead><tbody>';
+    var s=0;
+    for(var i=0;i<xs.length;i++){var cf=r.w.c[i]*ys[i];s+=cf;h1+='<tr><td>'+i+'</td><td>'+fmt(xs[i])+'</td><td>'+fmt(ys[i])+'</td><td>'+r.w.c[i]+'</td><td>'+fmt(cf)+'</td></tr>'}
+    h1+='<tr><th>Σ</th><td></td><td></td><td></td><th>'+fmt(s)+'</th></tr></tbody></table></div>';
+    h1+='<p class="hint">Integral = ('+r.w.lab+') · Σ = '+fmt(h*r.w.mult*s)+(P.fac!==1?' × '+P.fac+' = '+fmt(I):'')+'</p></details>';
+  }
+  return{html:h1+'</div>',I:I};
+}
+function summary(P,xs,ys,h,ms,title){
+  var t='<h3>'+title+'</h3><div class="scroll"><table><thead><tr><th>Método</th><th>Resultado ('+esc(P.unit||"u")+')</th><th>Error abs.</th><th>Error %</th></tr></thead><tbody>';
+  ms.forEach(function(m){
+    try{var I=integrate(m,xs,ys,h).I*P.fac,e=errCells(P,I);t+='<tr><td>'+NAMES[m]+'</td><td>'+fmt(I)+'</td><td>'+e[0]+'</td><td>'+e[1]+'</td></tr>'}
+    catch(x){t+='<tr><td>'+NAMES[m]+'</td><td colspan="3" style="text-align:left;white-space:normal;color:var(--mute)">No aplica: '+esc(x.message)+'</td></tr>'}
+  });
+  return t+'</tbody></table></div>';
+}
+
+function calc(){
+  $("msg").innerHTML="";
+  try{
+    var P=getProblem(),sel=$("met").value,ms=sel==="all"?["trap","s13","s38","comb"]:[sel];
+    var o='<div class="meta"><span>Subintervalos n = <b>'+P.n+'</b></span><span>Paso h = <b>'+fmt(P.h)+'</b>'+(P.ux?' '+esc(P.ux):'')+'</span><span>Puntos = <b>'+P.xs.length+'</b></span></div>';
+    o+='<div class="scroll">'+chart(P)+'</div>';
+    var okc=0,lastErr="";
+    ms.forEach(function(m){
+      try{o+=methodCard(m,P,P.xs,P.ys,P.h,true).html;okc++}
+      catch(e){lastErr=e.message;if(sel!=="all")throw e;o+='<div class="card"><strong>'+NAMES[m]+'</strong><p class="hint" style="color:var(--mute)">No aplica: '+esc(e.message)+'</p></div>'}
+    });
+    if(sel==="all"){
+      o+=summary(P,P.xs,P.ys,P.h,ms,"Comparación de métodos (n = "+P.n+")");
+      if(P.ref===null)o+='<p class="hint">Sin valor de referencia no se puede calcular el error verdadero.</p>';
+    }
+    if(mode==="f"&&$("dbl").checked){
+      var g=grid(P.curve.f,P.curve.a,P.curve.b,2*P.n);
+      o+=summary(P,g.xs,g.ys,(P.curve.b-P.curve.a)/(2*P.n),ms,"Comparación con 2n = "+(2*P.n));
+    }
+    $("out").innerHTML=o;
+  }catch(e){
+    $("msg").innerHTML='<div class="err">'+esc(e.message)+'</div>';
+  }
+}
+
+function runTest(){
+  $("msg").innerHTML="";
+  var f=function(x){return x*x},ref=8/3,o='<h3>Prueba de validación: ∫₀² x² dx = 8/3 ≈ '+fmt(ref)+'</h3><div class="scroll"><table><thead><tr><th>n</th><th>Método</th><th>Resultado</th><th>Error abs.</th><th>Error %</th></tr></thead><tbody>';
+  var simpsonOk=true,trapErr={};
+  [4,6,8].forEach(function(n){
+    var g=grid(f,0,2,n),h=2/n;
+    ["trap","s13","s38"].forEach(function(m){
+      try{var I=integrate(m,g.xs,g.ys,h).I,ea=Math.abs(ref-I);
+        o+='<tr><td>'+n+'</td><td>'+NAMES[m]+'</td><td>'+fmt(I)+'</td><td>'+fmt(ea)+'</td><td>'+fmt(100*ea/ref)+'</td></tr>';
+        if(m!=="trap"&&ea>1e-10)simpsonOk=false;
+        if(m==="trap")trapErr[n]=ea;
+      }catch(e){o+='<tr><td>'+n+'</td><td>'+NAMES[m]+'</td><td colspan="3" style="text-align:left;color:var(--mute)">No aplica (n incompatible)</td></tr>'}
+    });
+  });
+  var trapOk=trapErr[8]<trapErr[4];
+  o+='</tbody></table></div>';
+  o+='<p>Simpson reproduce 8/3 con error menor que 10⁻¹⁰: <span class="'+(simpsonOk?'ok':'bad')+'">'+(simpsonOk?'correcto':'falla')+'</span></p>';
+  o+='<p>El error del trapecio disminuye de n = 4 a n = 8 ('+fmt(trapErr[4])+' → '+fmt(trapErr[8])+'): <span class="'+(trapOk?'ok':'bad')+'">'+(trapOk?'correcto':'falla')+'</span></p>';
+  $("out").innerHTML=o;
+}
+
+function setMode(m){
+  mode=m;
+  $("pane-d").hidden=m!=="d";$("pane-f").hidden=m!=="f";
+  $("tab-d").setAttribute("aria-selected",m==="d");$("tab-f").setAttribute("aria-selected",m==="f");
+  $("msg").innerHTML="";
+}
+$("tab-d").onclick=function(){setMode("d")};
+$("tab-f").onclick=function(){setMode("f")};
+$("go").onclick=calc;
+$("test").onclick=runTest;
+$("clr").onclick=function(){
+  ["xs","ys","fx","a","b","n","ux","uy","fac","uf","ref"].forEach(function(i){$(i).value=""});
+  $("dbl").checked=false;$("met").value="all";$("msg").innerHTML="";
+  $("out").innerHTML='<p class="empty">Ingrese los datos y presione Calcular.</p>';
+};
+})();
+</script>
+</body>
+</html>
